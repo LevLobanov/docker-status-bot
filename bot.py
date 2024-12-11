@@ -1,4 +1,6 @@
+import datetime
 from pydoc import text
+from typing import Any
 from aiogram import Bot, Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.types import (Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton)
@@ -39,9 +41,9 @@ def parse_state(container_state: str) -> str:
     return premoji + ' ' + container_state
 
 
-def escape_markdown_v2(text: str) -> str:
+def escape_markdown_v2(text: Any) -> str:
     escape_chars = r'*_[]()~`>#+-=|{}.!'
-    return ''.join(f'\\{char}' if char in escape_chars else char for char in text)
+    return ''.join(f'\\{char}' if char in escape_chars else char for char in str(text))
 
 
 # Keyboards
@@ -56,13 +58,14 @@ def construct_container_menu_kb(container_id: str, container_state: str) -> Inli
     container_menu_kb = InlineKeyboardMarkup(row_width=1)
     container_menu_kb.add(InlineKeyboardButton(text="View logs", callback_data=f"Show_logs_{container_id}"))
     if container_state in ['dead', 'exited', 'created']:
-        container_menu_kb.add(InlineKeyboardButton(text="🟩 Up", callback_data=f"Manipulate_container_{container_id}_Up"))
+        container_menu_kb.add(InlineKeyboardButton(text="🟩 Start", callback_data=f"Manipulate_container_{container_id}_Start"))
     elif container_state == 'running':
         container_menu_kb.add(InlineKeyboardButton(text="🟥 Stop", callback_data=f"Manipulate_container_{container_id}_Stop"))
         container_menu_kb.add(InlineKeyboardButton(text="⏸ Pause", callback_data=f"Manipulate_container_{container_id}_Pause"))
     elif container_state == 'paused':
         container_menu_kb.add(InlineKeyboardButton(text="🟥 Stop", callback_data=f"Manipulate_container_{container_id}_Stop"))
         container_menu_kb.add(InlineKeyboardButton(text="⏯ Unpause", callback_data=f"Manipulate_container_{container_id}_Unpause"))
+    container_menu_kb.add(InlineKeyboardButton("🔄 Refresh", callback_data=f"Refresh_{container_id}"))
     return container_menu_kb
 
 
@@ -128,6 +131,7 @@ async def container_info(callback: CallbackQuery):
     else:
         await bot.send_message(chat_id=callback.from_user.id,
                                text="No container with given ID has been found!")
+    await callback.answer()
 
 
 @dp.callback_query_handler(text_startswith="Show_logs_", user_id=ADMIN_TG_ID)
@@ -145,3 +149,57 @@ async def show_logs(callback: CallbackQuery):
     else:
         await bot.send_message(callback.from_user.id,
                                "No container with given ID has been found!")
+    await callback.answer()
+
+
+@dp.callback_query_handler(text_startswith="Refresh_", user_id=ADMIN_TG_ID)
+async def refresh_container_info(callback: CallbackQuery):
+    message = callback.message
+    container = [container for container in await DokerCommandRunner.list_containers() if container.ID == callback.data[8:]]
+    if container:
+        container = container[0]
+        networks = "\n\t".join(container.Networks) if container.Networks else "NO NETWORKS"
+        ports = "\n\t".join(container.Ports) if container.Ports else "NO PORT MAPPINGS"
+        mounts = "\n\t".join(container.Mounts) if container.Mounts else "NO VOLUMES"
+        if container.State != message.text.split("\n\n")[1].split(" ")[1]:
+            await message.edit_text(text=textwrap.dedent(f'''
+                                        📦 Container\t*{escape_markdown_v2(container.Names)}* \\({container.ID}\\)
+
+                                        {parse_state(container.State)} \\| {escape_markdown_v2(container.Status)}
+                                    
+                                        💾 Image: *{escape_markdown_v2(container.Image)}*
+                                        🕸 Networks: {escape_markdown_v2(networks)}
+                                        🔌 Ports: {escape_markdown_v2(ports)}
+                                        ⌚ Running for: {escape_markdown_v2(container.RunningFor)}
+                                        💽 Size: {escape_markdown_v2(container.Size)}
+                                        🗂 Mounts: {escape_markdown_v2(mounts)}
+                                    '''),
+                                    parse_mode='MarkdownV2',
+                                    reply_markup=construct_container_menu_kb(container.ID, container.State))
+            await callback.answer()
+        else:
+            await callback.answer("Nothing changed")
+    else:
+        await message.edit_text("No container with given ID has been found! Seems it has been deleted...")
+        await callback.answer()
+
+
+@dp.callback_query_handler(text_startswith="Manipulate_container_", user_id=ADMIN_TG_ID)
+async def manipulate_container(callback: CallbackQuery):
+    timer_start = datetime.datetime.now()
+    container_id, operation = callback.data.split("_")[-2:]
+    message = await bot.send_message(callback.from_user.id, "Executing...\tThis may take some time")
+    match operation:
+        case 'Start':
+            await DokerCommandRunner.up_container(container_id)
+        case 'Stop':
+            await DokerCommandRunner.stop_container(container_id)
+        case 'Pause':
+            await DokerCommandRunner.pause_container(container_id)
+        case 'Unpause':
+            await DokerCommandRunner.unpause_container(container_id)
+    time_took = datetime.datetime.now() - timer_start
+    await message.edit_text(f"{operation} *{escape_markdown_v2(container_id)}* Complete in *{escape_markdown_v2(time_took.seconds)}s*",
+                            parse_mode="MarkdownV2")
+    callback.data = "Refresh_" + container_id
+    await refresh_container_info(callback)

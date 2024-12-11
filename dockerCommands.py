@@ -1,6 +1,8 @@
 import asyncio
 import json
+from sys import stdin
 from typing import Dict, List, Optional, Tuple
+from loguru import logger
 from pydantic import BaseModel, field_validator
 
 class ContainerInfo(BaseModel):
@@ -36,6 +38,7 @@ class DokerCommandRunner():
 
     @staticmethod
     async def execute_command(cmd: str) -> Tuple[int, str, str]:
+        logger.info("Executed: \"{cmd}\"")
         result = await asyncio.create_subprocess_shell(
             cmd,
             stdout=asyncio.subprocess.PIPE,
@@ -62,9 +65,45 @@ class DokerCommandRunner():
     @staticmethod
     async def show_container_logs(container_id: str) -> Optional[str]:
         cmd = f"docker logs {container_id} -t -n 25"
-        _, stdout, stderr = await DokerCommandRunner.execute_command(cmd)
+        _, _, stderr = await DokerCommandRunner.execute_command(cmd)
+        if stderr:
+            return stderr
+        
+    
+    @staticmethod
+    async def up_container(container_id: str) -> bool:
+        cmd = f"docker start {container_id}"
+        _, _, stderr = await DokerCommandRunner.execute_command(cmd)
         if not stderr:
-            return stdout
+            return True
+        return False
+    
+
+    @staticmethod
+    async def stop_container(container_id: str) -> bool:
+        cmd = f"docker stop {container_id}"
+        _, _, stderr = await DokerCommandRunner.execute_command(cmd)
+        if not stderr:
+            return True
+        return False
+    
+
+    @staticmethod
+    async def pause_container(container_id: str) -> bool:
+        cmd = f"docker pause {container_id}"
+        _, _, stderr = await DokerCommandRunner.execute_command(cmd)
+        if not stderr:
+            return True
+        return False
+    
+
+    @staticmethod
+    async def unpause_container(container_id: str) -> bool:
+        cmd = f"docker unpause {container_id}"
+        _, _, stderr = await DokerCommandRunner.execute_command(cmd)
+        if not stderr:
+            return True
+        return False
 
 
 if __name__ == "__main__":

@@ -1,5 +1,4 @@
 import datetime
-from pydoc import text
 from typing import Any
 from aiogram import Bot, Dispatcher
 from aiogram.dispatcher import FSMContext
@@ -54,10 +53,12 @@ menu_containers_btn = KeyboardButton(text="Containers")
 menu_kb.add(menu_containers_btn)
 
 
-def construct_container_menu_kb(container_id: str, container_state: str) -> InlineKeyboardMarkup:
+def construct_container_menu_kb(container_id: str, container_state: str, docker_compose: bool) -> InlineKeyboardMarkup:
     container_menu_kb = InlineKeyboardMarkup(row_width=1)
-    container_menu_kb.add(InlineKeyboardButton(text="View logs", callback_data=f"Show_logs_{container_id}"))
+    container_menu_kb.add(InlineKeyboardButton(text="📫 View logs", callback_data=f"Show_logs_{container_id}"))
     if container_state in ['dead', 'exited', 'created']:
+        if docker_compose:
+            container_menu_kb.add(InlineKeyboardButton(text="🟩 Start docker compose", callback_data=f"Manipulate_docker_compose_{container_id}_Start"))
         container_menu_kb.add(InlineKeyboardButton(text="🟩 Start", callback_data=f"Manipulate_container_{container_id}_Start"))
     elif container_state == 'running':
         container_menu_kb.add(InlineKeyboardButton(text="🟥 Stop", callback_data=f"Manipulate_container_{container_id}_Stop"))
@@ -93,7 +94,7 @@ async def on_start(message: Message, state: FSMContext):
     await state.finish()
 
 
-@dp.message_handler(text="Containers", user_id=ADMIN_TG_ID)
+@dp.message_handler(text=["Containers", "New list of containers"], user_id=ADMIN_TG_ID)
 async def list_containers(message: Message):
     containers = await DokerCommandRunner.list_containers()
     containers_inline_kb = InlineKeyboardMarkup(width=1)
@@ -125,9 +126,12 @@ async def container_info(callback: CallbackQuery):
                                     ⌚ Running for: {escape_markdown_v2(container.RunningFor)}
                                     💽 Size: {escape_markdown_v2(container.Size)}
                                     🗂 Mounts: {escape_markdown_v2(mounts)}
+                                    🗃 Docker compose: {'*' + escape_markdown_v2(container.Labels.get('com.docker.compose.project')) + '*'
+                                                        if container.Compose
+                                                        else "NOT IN DOCKER COMPOSE"}
                                 '''),
                                 parse_mode='MarkdownV2',
-                                reply_markup=construct_container_menu_kb(container.ID, container.State))
+                                reply_markup=construct_container_menu_kb(container.ID, container.State, container.Compose))
     else:
         await bot.send_message(chat_id=callback.from_user.id,
                                text="No container with given ID has been found!")
@@ -173,9 +177,12 @@ async def refresh_container_info(callback: CallbackQuery):
                                         ⌚ Running for: {escape_markdown_v2(container.RunningFor)}
                                         💽 Size: {escape_markdown_v2(container.Size)}
                                         🗂 Mounts: {escape_markdown_v2(mounts)}
+                                        🗃 Docker compose: {'*' + escape_markdown_v2(container.Labels.get('com.docker.compose.project')) + '*'
+                                                            if container.Compose
+                                                            else "NOT IN DOCKER COMPOSE"}
                                     '''),
                                     parse_mode='MarkdownV2',
-                                    reply_markup=construct_container_menu_kb(container.ID, container.State))
+                                    reply_markup=construct_container_menu_kb(container.ID, container.State, container.Compose))
             await callback.answer()
         else:
             await callback.answer("Nothing changed")
@@ -201,5 +208,24 @@ async def manipulate_container(callback: CallbackQuery):
     time_took = datetime.datetime.now() - timer_start
     await message.edit_text(f"{operation} *{escape_markdown_v2(container_id)}* Complete in *{escape_markdown_v2(time_took.seconds)}s*",
                             parse_mode="MarkdownV2")
+    callback.data = "Refresh_" + container_id
+    await refresh_container_info(callback)
+
+
+@dp.callback_query_handler(text_startswith="Manipulate_docker_compose_", user_id=ADMIN_TG_ID)
+async def manipulate_docker_compose(callback: CallbackQuery):
+    timer_start = datetime.datetime.now()
+    container_id, operation = callback.data.split("_")[-2:]
+    print(container_id)
+    message = await bot.send_message(callback.from_user.id, "Executing...\tThis may take some time")
+    match operation:
+        case 'Start':
+            await DokerCommandRunner.docker_compose_up(container_id)
+    time_took = datetime.datetime.now() - timer_start
+    await message.edit_text(f"Docker compose {operation} *{escape_markdown_v2(container_id)}* Complete in *{escape_markdown_v2(time_took.seconds)}s*",
+                            parse_mode="MarkdownV2")
+    await bot.send_message(callback.from_user.id,
+                           "Docker compose operations might change ID of container\n\nButtons on old messages might not work",
+                           reply_markup=ReplyKeyboardMarkup().add(KeyboardButton(text="New list of containers")))
     callback.data = "Refresh_" + container_id
     await refresh_container_info(callback)

@@ -1,6 +1,5 @@
 import asyncio
 import json
-from sys import stdin
 from typing import Dict, List, Optional, Tuple
 from loguru import logger
 from pydantic import BaseModel, field_validator
@@ -10,7 +9,7 @@ class ContainerInfo(BaseModel):
     CreatedAt: str
     ID: str
     Image: str
-    Labels: Optional[List[Dict[str, str]]] = []
+    Labels: Dict[str, str] = {}
     LocalVolumes: int
     Mounts: Optional[List[str]] = []
     Names: str
@@ -20,29 +19,46 @@ class ContainerInfo(BaseModel):
     Size: str
     State: str
     Status: str
+    Compose: bool = False
 
     @field_validator('Labels', mode='before')
     def parse_labels(cls, v):
         if not v:
-            return []
-        return [{item.split('=')[0]: item.split('=')[1]} for item in v.split(',')]
+            return {}
+        labels = {}
+        last_key = ""
+        for item in v.split(','):
+            if '=' in item:
+                last_key = item.split('=')[0]
+                labels[item.split('=')[0]] = item.split('=')[1]
+            else:
+                labels[last_key] += (',' + item)
+        return labels
 
     @field_validator('Mounts', 'Networks', 'Ports', mode='before')
     def parse_comma_separated(cls, v):
         if not v:
             return []
         return v.split(',')
+    
+    def __init__(self, **data):
+        super().__init__(**data)
+        self.set_compose()
+    
+    def set_compose(self):
+        self.Compose = bool(self.Labels) and "com.docker.compose.config-hash" in self.Labels
 
 
 class DokerCommandRunner():
 
     @staticmethod
-    async def execute_command(cmd: str) -> Tuple[int, str, str]:
-        logger.info("Executed: \"{cmd}\"")
+    async def execute_command(cmd: str, cwd: str | None = None) -> Tuple[int, str, str]:
+        logger.info(f"Executed: \"{cmd}\"{ ' in: ' + cwd if cwd else ''}")
         result = await asyncio.create_subprocess_shell(
             cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            cwd= cwd
         )
         stdout, stderr = await result.communicate()
         return (
@@ -77,6 +93,16 @@ class DokerCommandRunner():
         if not stderr:
             return True
         return False
+    
+    @staticmethod
+    async def docker_compose_up(container_id: str) -> str:
+        container = [cont for cont in await DokerCommandRunner.list_containers() if cont.ID == container_id]
+        if container and container[0].Compose:
+            cmd = f"docker-compose up -d"
+            _, _, _ = await DokerCommandRunner.execute_command(cmd, cwd = container[0].Labels.get("com.docker.compose.project.working_dir", None))
+            return "complete"
+        else:
+            return "Container not in docker compose"
     
 
     @staticmethod

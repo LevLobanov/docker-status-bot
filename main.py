@@ -7,7 +7,7 @@ if __name__ == '__main__':
     logger.remove()
     logger.add(
         sink="logs/price_changer.log",
-        format="<level>{level}</level> | {time:YYYY MMMM D, HH:mm:ss} | <level>{message}</level> | <blue>{extra}</blue>",
+        format="<level>{level}</level> | {time:YYYY MMMM D, HH:mm:ss} | <level>{message}</level>",
         level="INFO",
         rotation="1 days",
         retention="1 months"

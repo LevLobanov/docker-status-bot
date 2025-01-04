@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 from typing import Any
 from aiogram import Bot, Dispatcher
@@ -45,6 +46,17 @@ def escape_markdown_v2(text: Any) -> str:
     return ''.join(f'\\{char}' if char in escape_chars else char for char in str(text))
 
 
+async def loop_check_containers(recipient_id: int, bot: Bot):
+    cur_containers_ids = []
+    while True:
+        new_containers_ids = [(container.ID, container.Names) for container in await DokerCommandRunner().list_containers() if container.State == "running"]
+        for id, name in cur_containers_ids:
+            if id not in [c[0] for c in new_containers_ids]:
+                await bot.send_message(recipient_id, f"⚠ Container {name} exited. ⚠")
+        cur_containers_ids = new_containers_ids
+        await asyncio.sleep(10)
+
+
 # Keyboards
 
 
@@ -79,9 +91,10 @@ def construct_back_container_kb(container_id: str) -> InlineKeyboardMarkup:
 # Handlers
 
 
-async def on_startup(_):
+async def on_startup(dp: Dispatcher):
     logger.info("running...")
-    await bot.send_message(ADMIN_TG_ID, "Im Running\n\n/start")
+    await bot.send_message(ADMIN_TG_ID[0], "Im Running\n\n/start")
+    asyncio.create_task(loop_check_containers(ADMIN_TG_ID[0], dp.bot))
 
 
 async def on_shutdown(_):

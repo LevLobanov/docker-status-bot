@@ -4,4 +4,4 @@ import os
 load_dotenv()
 
 BOT_TOKEN = os.getenv("bot_token")
-ADMIN_TG_ID = [int(id) for id in str(os.getenv("admin_tg_id")).split(',')]
+ADMIN_TG_ID = [int(id) for id in str(os.getenv("admin_tg_id")).replace(' ', '').split(',')]

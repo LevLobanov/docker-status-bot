@@ -102,6 +102,17 @@ class DokerCommandRunner():
             _, _, _ = await DokerCommandRunner.execute_command(cmd, cwd = container[0].Labels.get("com.docker.compose.project.working_dir", None))
             return "complete"
         else:
+            return "Container not in docker compose, or its unknown"
+    
+
+    @staticmethod
+    async def docker_compose_stop(container_id: str) -> str:
+        container = [cont for cont in await DokerCommandRunner.list_containers() if cont.ID == container_id]
+        if container and container[0].Compose:
+            cmd = f"docker-compose stop"
+            _, _, _ = await DokerCommandRunner.execute_command(cmd, cwd = container[0].Labels.get("com.docker.compose.project.working_dir", None))
+            return "complete"
+        else:
             return "Container not in docker compose"
     
 

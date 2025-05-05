@@ -136,7 +136,7 @@ async def container_info(callback: CallbackQuery):
                                     💾 Image: *{escape_markdown_v2(container.Image)}*
                                     🕸 Networks: {escape_markdown_v2(networks)}
                                     🔌 Ports: {escape_markdown_v2(ports)}
-                                    ⌚ Running for: {escape_markdown_v2(container.RunningFor)}
+                                    ⌚ Created: {escape_markdown_v2(container.RunningFor)}
                                     💽 Size: {escape_markdown_v2(container.Size)}
                                     🗂 Mounts: {escape_markdown_v2(mounts)}
                                     🗃 Docker compose: {'*' + escape_markdown_v2(container.Labels.get('com.docker.compose.project')) + '*'
@@ -187,7 +187,7 @@ async def refresh_container_info(callback: CallbackQuery):
                                         💾 Image: *{escape_markdown_v2(container.Image)}*
                                         🕸 Networks: {escape_markdown_v2(networks)}
                                         🔌 Ports: {escape_markdown_v2(ports)}
-                                        ⌚ Running for: {escape_markdown_v2(container.RunningFor)}
+                                        ⌚ Created: {escape_markdown_v2(container.RunningFor)}
                                         💽 Size: {escape_markdown_v2(container.Size)}
                                         🗂 Mounts: {escape_markdown_v2(mounts)}
                                         🗃 Docker compose: {'*' + escape_markdown_v2(container.Labels.get('com.docker.compose.project')) + '*'

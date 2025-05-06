@@ -1,4 +1,4 @@
-# 🐳 docker-status-bot ![Version](https://img.shields.io/badge/version-1.1.0-green.svg)
+# 🐳 docker-status-bot ![Version](https://img.shields.io/badge/version-1.1.1-green.svg)
 
 ![Python](https://img.shields.io/badge/python-3.11-blue.svg)
 
@@ -13,15 +13,16 @@
 - ##### 🔨 Start / Stop / Pause / Unpause
 - ##### 📁 See container logs
 - ##### 📃 Log containers manipulations
-- ##### 🗃 Simple docker compose compability
-- #### Alarms of container stops
+- ##### 🗃 Docker compose Start / Stop
 
 ## TODO:
-- #### Autostart on stop
+- #### Alarms of container stops
 - #### Further docker compose compability
 - #### Docker exec command
-- #### Remove containers
+- #### Create images and containers
+- #### Remove images and containers
 - #### REST API
+- #### Move to python 3.12 + (aiogram 2.x -> 3.x)
 
 ***
 

@@ -73,9 +73,13 @@ def construct_container_menu_kb(container_id: str, container_state: str, docker_
             container_menu_kb.add(InlineKeyboardButton(text="🟩 Start docker compose", callback_data=f"Manipulate_docker_compose_{container_id}_Start"))
         container_menu_kb.add(InlineKeyboardButton(text="🟩 Start", callback_data=f"Manipulate_container_{container_id}_Start"))
     elif container_state == 'running':
+        if docker_compose:
+            container_menu_kb.add(InlineKeyboardButton(text="🟥 Stop docker compose", callback_data=f"Manipulate_docker_compose_{container_id}_Stop"))
         container_menu_kb.add(InlineKeyboardButton(text="🟥 Stop", callback_data=f"Manipulate_container_{container_id}_Stop"))
         container_menu_kb.add(InlineKeyboardButton(text="⏸ Pause", callback_data=f"Manipulate_container_{container_id}_Pause"))
     elif container_state == 'paused':
+        if docker_compose:
+            container_menu_kb.add(InlineKeyboardButton(text="🟥 Stop docker compose", callback_data=f"Manipulate_docker_compose_{container_id}_Stop"))
         container_menu_kb.add(InlineKeyboardButton(text="🟥 Stop", callback_data=f"Manipulate_container_{container_id}_Stop"))
         container_menu_kb.add(InlineKeyboardButton(text="⏯ Unpause", callback_data=f"Manipulate_container_{container_id}_Unpause"))
     container_menu_kb.add(InlineKeyboardButton("🔄 Refresh", callback_data=f"Refresh_{container_id}"))
@@ -234,6 +238,8 @@ async def manipulate_docker_compose(callback: CallbackQuery):
     match operation:
         case 'Start':
             await DokerCommandRunner.docker_compose_up(container_id)
+        case 'Stop':
+            await DokerCommandRunner.docker_compose_stop(container_id)
     time_took = datetime.datetime.now() - timer_start
     await message.edit_text(f"Docker compose {operation} *{escape_markdown_v2(container_id)}* Complete in *{escape_markdown_v2(time_took.seconds)}s*",
                             parse_mode="MarkdownV2")
